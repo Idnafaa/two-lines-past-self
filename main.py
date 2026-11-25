@@ -8,7 +8,13 @@ changed because of it. The whole text stays within 280 characters.
 """
 
 import os
+import re
 import sys
+
+# Abbreviations whose periods do not end a sentence.
+_ABBREVIATIONS = ("p.m.", "a.m.", "e.g.", "i.e.", "Mr.", "Mrs.", "Dr.")
+
+_SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
 
 LINE_ONE = (
     "Don't tell your mother 'I'll call you back' at 9:03 p.m. "
@@ -21,10 +27,22 @@ LINE_TWO = (
 )
 
 
+def count_sentences(line: str) -> int:
+    """Count sentences in one line, ignoring periods inside abbreviations."""
+    masked = line
+    for abbr in _ABBREVIATIONS:
+        masked = masked.replace(abbr, abbr.replace(".", "\x00"))
+    return len(_SENTENCE_END.findall(masked))
+
+
 def build_entry() -> str:
     first = " ".join(LINE_ONE.split())
     second = " ".join(LINE_TWO.split())
+    if first == second:
+        raise ValueError("line two must not restate line one")
     for line in (first, second):
+        if count_sentences(line) != 1:
+            raise ValueError(f"each line must be exactly one sentence: {line!r}")
         if not line.endswith("."):
             raise ValueError("each line must be one complete sentence")
     text = first + "\n" + second
